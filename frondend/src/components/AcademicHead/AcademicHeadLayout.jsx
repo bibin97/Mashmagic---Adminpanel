@@ -12,7 +12,9 @@ import {
     Activity,
     ClipboardList,
     MessageSquare,
-    Briefcase
+    Briefcase,
+    GraduationCap,
+    Users
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -24,10 +26,10 @@ const AcademicHeadLayout = () => {
         { path: '/academic-head/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
         { path: '/academic-head/actions', icon: <Activity size={18} />, label: 'Actions Center' },
         { path: '/academic-head/registrations', icon: <UserPlus size={18} />, label: 'Registrations' },
+        { path: '/academic-head/students', icon: <GraduationCap size={18} />, label: 'Students' },
+        { path: '/academic-head/mentors', icon: <Users size={18} />, label: 'Mentors' },
+        { path: '/academic-head/faculties', icon: <Briefcase size={18} />, label: 'Faculties' },
         { path: '/academic-head/tasks', icon: <Briefcase size={18} />, label: 'Workforce Tasks' },
-        { path: '/academic-head/faculty-activity', icon: <ClipboardList size={18} />, label: 'Academic Reports' },
-        { path: '/academic-head/student-logs', icon: <MessageSquare size={18} />, label: 'Student Interactions' },
-        { path: '/academic-head/faculty-logs', icon: <Briefcase size={18} />, label: 'Staff Intake Logs' },
         { path: '/academic-head/checking', icon: <ShieldAlert size={18} />, label: 'Institutional Audit' },
     ];
 

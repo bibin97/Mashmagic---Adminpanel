@@ -159,7 +159,7 @@ const MentorHeadDashboard = () => {
                     <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Verification Progress</h4>
                     {dailySummary.totalStudents > 0 ? (
                         <div className="h-32 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                 <PieChart>
                                     <Pie
                                         data={[
@@ -206,7 +206,7 @@ const MentorHeadDashboard = () => {
 
                 <div className="h-[300px] w-full relative z-10">
                     {examData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <PieChart>
                                 <Pie
                                     data={examData}
@@ -267,12 +267,11 @@ const MentorHeadDashboard = () => {
                                     <div className="w-[calc(100%-5rem)] md:w-[calc(50%-4rem)] p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-xs">
-                                                    {activity.mentor_name.charAt(0)}
-                                                </div>
                                                 <div>
-                                                    <span className="text-xs font-black uppercase tracking-widest text-indigo-600">Mentor Update</span>
-                                                    <h4 className="font-bold text-slate-900 text-sm">{activity.mentor_name}</h4>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                                                        {activity.type || 'Mentor Update'}
+                                                    </span>
+                                                    <h4 className="font-bold text-slate-900 text-sm mt-1">{activity.mentor_name}</h4>
                                                 </div>
                                             </div>
                                             <div className="text-right">

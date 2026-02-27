@@ -4,8 +4,11 @@ import Modal from '../../components/Modal';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { UserSquare2, GraduationCap } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const Faculties = () => {
+    const { user } = useAuth();
+    const isSuperAdmin = user?.role === 'super_admin';
     const [faculties, setFaculties] = useState([]);
     const [filteredFaculties, setFilteredFaculties] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -46,6 +49,11 @@ const Faculties = () => {
             f.phone?.toLowerCase().includes(query.toLowerCase())
         );
         setFilteredFaculties(filtered);
+    };
+
+    const handleView = (faculty) => {
+        setSelectedFaculty(faculty);
+        setIsModalOpen(true);
     };
 
     const handleEdit = (faculty) => {
@@ -134,10 +142,10 @@ const Faculties = () => {
                 loading={loading}
                 onSearch={handleSearch}
                 onView={handleView}
-                onApprove={handleApprove}
-                onBlock={handleBlock}
-                onDelete={handleDelete}
-                onEdit={handleEdit}
+                onApprove={isSuperAdmin ? handleApprove : undefined}
+                onBlock={isSuperAdmin ? handleBlock : undefined}
+                onDelete={isSuperAdmin ? handleDelete : undefined}
+                onEdit={isSuperAdmin ? handleEdit : undefined}
                 searchPlaceholder="Search leads by name or email..."
             />
 

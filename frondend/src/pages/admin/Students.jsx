@@ -3,8 +3,11 @@ import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 
 const Students = () => {
+    const { user } = useAuth();
+    const isSuperAdmin = user?.role === 'super_admin';
     const [students, setStudents] = useState([]);
     const [filteredStudents, setFilteredStudents] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -151,10 +154,10 @@ const Students = () => {
                 loading={loading}
                 onSearch={handleSearch}
                 onView={handleView}
-                onApprove={handleApprove}
-                onBlock={handleBlock}
-                onDelete={handleDelete}
-                onEdit={handleEdit}
+                onApprove={isSuperAdmin ? handleApprove : undefined}
+                onBlock={isSuperAdmin ? handleBlock : undefined}
+                onDelete={isSuperAdmin ? handleDelete : undefined}
+                onEdit={isSuperAdmin ? handleEdit : undefined}
                 searchPlaceholder="Search students by name or email..."
             />
 

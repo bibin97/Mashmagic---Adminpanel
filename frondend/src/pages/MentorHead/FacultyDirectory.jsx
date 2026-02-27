@@ -1,0 +1,239 @@
+import React, { useState, useEffect } from 'react';
+import {
+    Users, Search, Edit2, Trash2, X, Save,
+    ShieldCheck, Activity, MapPin, Phone, Mail, Calendar, Briefcase
+} from 'lucide-react';
+import api from '../../services/api';
+import toast from 'react-hot-toast';
+
+const FacultyDirectory = () => {
+    const [faculties, setFaculties] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Edit Modal States
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingFaculty, setEditingFaculty] = useState(null);
+
+    useEffect(() => {
+        fetchFaculties();
+    }, []);
+
+    const fetchFaculties = async () => {
+        try {
+            const res = await api.get('/mentor-head/faculties-all');
+            if (res.data.success) {
+                setFaculties(res.data.data);
+            }
+        } catch (error) {
+            toast.error("Failed to load faculty directory");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEdit = (faculty) => {
+        setEditingFaculty({ ...faculty });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdate = async () => {
+        try {
+            const res = await api.put(`/mentor-head/faculties/${editingFaculty.id}`, editingFaculty);
+            if (res.data.success) {
+                toast.success("Faculty profile updated");
+                setIsEditModalOpen(false);
+                fetchFaculties();
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Update failed");
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm("PERMANENT ACTION: Remove this faculty member from system?")) return;
+        try {
+            const res = await api.delete(`/mentor-head/faculties/${id}`);
+            if (res.data.success) {
+                toast.success("Faculty record deleted");
+                fetchFaculties();
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Delete failed");
+        }
+    };
+
+    const filteredFaculties = faculties.filter(f =>
+        f.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        f.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (loading) return <div className="p-20 text-center font-black text-slate-400 animate-pulse">SYNCING FACULTY DATA...</div>;
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-700">
+            {/* Header */}
+            <div className="bg-white p-10 rounded-[4rem] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                    <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic flex items-center gap-4">
+                        <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 rotate-3">
+                            <Briefcase size={28} />
+                        </div>
+                        Faculty Registry
+                    </h2>
+                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-3 flex items-center gap-2">
+                        <ShieldCheck size={14} className="text-emerald-500" />
+                        Mentor Head level oversight of teaching staff and account status
+                    </p>
+                </div>
+
+                <div className="relative group">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
+                    <input
+                        type="text"
+                        placeholder="FILTER BY NAME OR EMAIL..."
+                        className="pl-14 pr-8 py-4 bg-slate-50 border border-slate-100 rounded-3xl text-xs font-bold uppercase tracking-[0.1em] focus:ring-4 ring-indigo-500/10 w-full md:w-96 shadow-sm transition-all outline-none focus:bg-white"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            {/* List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {filteredFaculties.length > 0 ? filteredFaculties.map((faculty) => (
+                    <div key={faculty.id} className="bg-white group rounded-[3rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 overflow-hidden">
+                        <div className="p-8">
+                            <div className="flex justify-between items-start mb-6">
+                                <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-indigo-600 rounded-3xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-emerald-100 group-hover:scale-110 transition-transform">
+                                    {faculty.name.charAt(0)}
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handleEdit(faculty)}
+                                        className="p-3 bg-slate-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(faculty.id)}
+                                        className="p-3 bg-slate-50 text-rose-600 rounded-2xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase italic">{faculty.name}</h3>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <Activity size={12} className="text-emerald-500" />
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{faculty.status || 'Active Faculty'}</span>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-50 space-y-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400">
+                                            <Mail size={14} />
+                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-600 break-all">{faculty.email}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400">
+                                            <Phone size={14} />
+                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-600">{faculty.phone_number}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400">
+                                            <MapPin size={14} />
+                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{faculty.place || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )) : (
+                    <div className="col-span-full py-20 text-center bg-white rounded-[3rem] border border-slate-100 shadow-sm">
+                        <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.3em]">System empty or no faculty found</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Edit Modal */}
+            {isEditModalOpen && editingFaculty && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h2 className="text-lg font-black text-slate-900 flex items-center gap-3 italic">
+                                <Edit2 size={20} className="text-emerald-600" /> Edit Faculty Profile
+                            </h2>
+                            <button onClick={() => setIsEditModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white rounded-xl text-slate-400 hover:text-slate-600 hover:shadow-md transition-all">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Full Name</label>
+                                <input
+                                    type="text"
+                                    value={editingFaculty.name}
+                                    onChange={(e) => setEditingFaculty(prev => ({ ...prev, name: e.target.value }))}
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-300 transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address</label>
+                                <input
+                                    type="email"
+                                    value={editingFaculty.email}
+                                    onChange={(e) => setEditingFaculty(prev => ({ ...prev, email: e.target.value }))}
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-300 transition-all"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone Number</label>
+                                    <input
+                                        type="text"
+                                        value={editingFaculty.phone_number}
+                                        onChange={(e) => setEditingFaculty(prev => ({ ...prev, phone_number: e.target.value }))}
+                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-300 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Place / Location</label>
+                                    <input
+                                        type="text"
+                                        value={editingFaculty.place || ''}
+                                        onChange={(e) => setEditingFaculty(prev => ({ ...prev, place: e.target.value }))}
+                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-300 transition-all"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-8 py-6 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+                            >
+                                Discard
+                            </button>
+                            <button
+                                onClick={handleUpdate}
+                                className="px-8 py-3.5 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2"
+                            >
+                                <Save size={16} /> Update Record
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default FacultyDirectory;

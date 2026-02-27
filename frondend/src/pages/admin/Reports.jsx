@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FileText, DownloadCloud, Filter, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import api from '../../services/api';
 
 const Reports = () => {
     const [filters, setFilters] = useState({
@@ -9,15 +10,65 @@ const Reports = () => {
         category: 'All'
     });
 
-    const handleDownload = (type) => {
-        toast.promise(
-            new Promise((resolve) => setTimeout(resolve, 1500)),
-            {
-                loading: `Preparing ${type} Analytics...`,
-                success: `${type} Data exported to CSV successfully!`,
-                error: `Failed to generate ${type} export.`,
+    const downloadAsCSV = (data, filename) => {
+        if (!data || !data.length) {
+            toast.error("No data available to export");
+            return;
+        }
+
+        const headers = Object.keys(data[0]);
+        const csvRows = [
+            headers.join(','), // Header row
+            ...data.map(row =>
+                headers.map(header => {
+                    const value = row[header] === null ? '' : row[header];
+                    // Handle commas in values by wrapping in quotes
+                    return typeof value === 'string' && value.includes(',')
+                        ? `"${value}"`
+                        : value;
+                }).join(',')
+            )
+        ];
+
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleDownload = async (type) => {
+        const loadingToast = toast.loading(`Preparing ${type} Analytics...`);
+        try {
+            let endpoint = '';
+            let filename = '';
+
+            if (type === 'Student') {
+                endpoint = '/admin/students';
+                filename = 'student_analytics';
+            } else if (type === 'Mentor') {
+                endpoint = '/admin/mentors';
+                filename = 'mentor_analytics';
+            } else if (type === 'Task') {
+                endpoint = '/tasks';
+                filename = 'task_analytics';
             }
-        );
+
+            const response = await api.get(endpoint);
+
+            if (response.data.success) {
+                downloadAsCSV(response.data.data, filename);
+                toast.success(`${type} Data exported successfully!`, { id: loadingToast });
+            } else {
+                throw new Error(response.data.message || "Failed to fetch data");
+            }
+        } catch (error) {
+            console.error(`Export error for ${type}:`, error);
+            toast.error(`Failed to generate ${type} export: ${error.message}`, { id: loadingToast });
+        }
     };
 
     return (

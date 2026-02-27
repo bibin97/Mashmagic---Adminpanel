@@ -1,27 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import {
-    User,
-    Phone,
-    MapPin,
-    Calendar,
-    ArrowLeft,
-    ScrollText,
-    GraduationCap,
-    CheckCircle2,
-    Clock,
-    Loader2,
-    BookOpen,
-    Search,
-    Filter,
-    ChevronRight,
-    Activity,
-    ShieldCheck,
-    Users,
-    AlertCircle,
-    History
+    User, Phone, MapPin, Calendar, ArrowLeft, GraduationCap, Clock, Activity, ShieldCheck, Users, AlertCircle, Edit2, Trash2, X, Save, ChevronRight, Search, Filter
 } from 'lucide-react';
+import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 const MentorDetails = () => {
@@ -29,36 +11,36 @@ const MentorDetails = () => {
     const navigate = useNavigate();
     const [mentorData, setMentorData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('student');
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingStudent, setEditingStudent] = useState(null);
 
     // Search & Filter States
     const [studentSearch, setStudentSearch] = useState('');
     const [studentFilter, setStudentFilter] = useState('all');
-    const [logSearch, setLogSearch] = useState('');
+    const [studentSort, setStudentSort] = useState('desc');
+
+    const fetchMentorDetails = async () => {
+        try {
+            const [detailsRes, monitoringRes] = await Promise.all([
+                api.get(`/mentor-head/mentor/${id}/details`),
+                api.get(`/mentor-head/mentors/${id}/monitoring`)
+            ]);
+
+            if (detailsRes.data.success && monitoringRes.data.success) {
+                setMentorData({
+                    ...detailsRes.data.data,
+                    monitoring: monitoringRes.data.data
+                });
+            }
+        } catch (error) {
+            console.error('Error details:', error);
+            toast.error("Failed to fetch mentor details");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchMentorDetails = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const [detailsRes, monitoringRes] = await Promise.all([
-                    axios.get(`http://localhost:5000/api/mentor-head/mentor/${id}/details`, { headers: { Authorization: `Bearer ${token}` } }),
-                    axios.get(`http://localhost:5000/api/mentor-head/mentors/${id}/monitoring`, { headers: { Authorization: `Bearer ${token}` } })
-                ]);
-
-                if (detailsRes.data.success && monitoringRes.data.success) {
-                    setMentorData({
-                        ...detailsRes.data.data,
-                        monitoring: monitoringRes.data.data
-                    });
-                }
-            } catch (error) {
-                console.error('Error details:', error);
-                toast.error("Failed to fetch mentor details");
-            } finally {
-                setLoading(false);
-            }
-        };
-
         if (id) fetchMentorDetails();
     }, [id]);
 
@@ -81,24 +63,52 @@ const MentorDetails = () => {
     }, [mentorData]);
 
     const filteredStudents = useMemo(() => {
-        return enrichedStudents.filter(s => {
+        let result = enrichedStudents.filter(s => {
             const matchesSearch = s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
                 s.faculty_name?.toLowerCase().includes(studentSearch.toLowerCase());
             const matchesFilter = studentFilter === 'all' || s.onboarding_status === studentFilter;
             return matchesSearch && matchesFilter;
         });
-    }, [enrichedStudents, studentSearch, studentFilter]);
 
-    const filteredLogs = useMemo(() => {
-        if (!mentorData) return [];
-        const currentLogs = activeTab === 'student' ? mentorData.logs : mentorData.facultyLogs;
-
-        return currentLogs.filter(log => {
-            const matchesSearch = log.student_name?.toLowerCase().includes(logSearch.toLowerCase()) ||
-                (log.details || log.notes || log.chapter)?.toLowerCase().includes(logSearch.toLowerCase());
-            return matchesSearch;
+        return result.sort((a, b) => {
+            if (studentSort === 'desc') return b.id - a.id;
+            if (studentSort === 'asc') return a.id - b.id;
+            return 0;
         });
-    }, [mentorData, activeTab, logSearch]);
+    }, [enrichedStudents, studentSearch, studentFilter, studentSort]);
+
+    const handleEditStudent = (student) => {
+        setEditingStudent({ ...student });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateStudent = async () => {
+        try {
+            const res = await api.put(`/mentor-head/students/${editingStudent.id}`, editingStudent);
+            if (res.data.success) {
+                toast.success('Student details updated');
+                setIsEditModalOpen(false);
+                fetchMentorDetails(); // Refresh
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Update failed');
+        }
+    };
+
+    const handleDeleteStudent = async (studentId) => {
+        if (!window.confirm("Permanently delete this student record?")) return;
+        try {
+            const res = await api.delete(`/mentor-head/students/${studentId}`);
+            if (res.data.success) {
+                toast.success('Student removed');
+                fetchMentorDetails(); // Refresh
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Delete failed');
+        }
+    };
+
+
 
     if (loading) {
         return (
@@ -305,6 +315,17 @@ const MentorDetails = () => {
                                 <option value="completed">Active</option>
                             </select>
                         </div>
+                        <div className="relative">
+                            <Clock size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-indigo-500" />
+                            <select
+                                value={studentSort}
+                                onChange={(e) => setStudentSort(e.target.value)}
+                                className="bg-white border border-slate-200 text-indigo-600 rounded-[1.5rem] py-4 pl-12 pr-10 text-[11px] font-black uppercase tracking-widest appearance-none focus:ring-4 focus:ring-indigo-100 outline-none cursor-pointer"
+                            >
+                                <option value="desc">Newest First</option>
+                                <option value="asc">Oldest First</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -317,7 +338,8 @@ const MentorDetails = () => {
                                 <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Last Interaction</th>
                                 <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Sessions</th>
                                 <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Verifications</th>
-                                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Status</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -362,15 +384,33 @@ const MentorDetails = () => {
                                             {s.verificationCount}
                                         </div>
                                     </td>
-                                    <td className="px-10 py-8 text-right">
+                                    <td className="px-10 py-8">
                                         <span className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${s.onboarding_status === 'completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
                                             {s.onboarding_status === 'completed' ? 'Active' : 'Onboarding'}
                                         </span>
                                     </td>
+                                    <td className="px-10 py-8 text-right">
+                                        <div className="flex items-center justify-end gap-3">
+                                            <button
+                                                onClick={() => handleEditStudent(s)}
+                                                className="p-2.5 bg-white border border-slate-200 rounded-xl text-blue-600 hover:bg-blue-50 transition-all shadow-sm"
+                                                title="Edit Student"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteStudent(s.id)}
+                                                className="p-2.5 bg-white border border-slate-200 rounded-xl text-rose-600 hover:bg-rose-50 transition-all shadow-sm"
+                                                title="Delete Student"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan="6" className="px-10 py-24 text-center">
+                                    <td colSpan="7" className="px-10 py-24 text-center">
                                         <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-6 shadow-inner">
                                             <Search size={40} />
                                         </div>
@@ -384,170 +424,87 @@ const MentorDetails = () => {
                 </div>
             </div>
 
-            {/* SECTION 4: ACTIVITY LOGS (TABS – FULL WIDTH) */}
-            <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/20 overflow-hidden">
-                <div className="p-10 border-b border-slate-100 flex flex-col lg:flex-row justify-between lg:items-center gap-10 bg-slate-50/10">
-                    <div className="flex items-center gap-6">
-                        <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-indigo-600 shadow-2xl shadow-slate-200/40 border border-slate-50">
-                            <History size={32} />
-                        </div>
-                        <div>
-                            <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">Detailed Activity Logs</h3>
-                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Operational Interaction Intelligence</p>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-6">
-                        {/* Tab Switcher */}
-                        <div className="inline-flex p-2 bg-slate-100 rounded-[1.75rem] border border-slate-200 shadow-inner">
-                            <button
-                                onClick={() => setActiveTab('student')}
-                                className={`flex items-center gap-3 px-8 py-3.5 rounded-[1.25rem] text-[11px] font-black uppercase tracking-widest transition-all duration-300 ${activeTab === 'student' ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-200 translate-y-[-2px]' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                                <GraduationCap size={16} /> Student Matrix
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('faculty')}
-                                className={`flex items-center gap-3 px-8 py-3.5 rounded-[1.25rem] text-[11px] font-black uppercase tracking-widest transition-all duration-300 ${activeTab === 'faculty' ? 'bg-purple-600 text-white shadow-2xl shadow-purple-200 translate-y-[-2px]' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                                <ShieldCheck size={16} /> Faculty Matrix
+            {/* Student Edit Modal */}
+            {isEditModalOpen && editingStudent && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-4 duration-300 border border-white/20">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h2 className="text-lg font-black text-slate-900 flex items-center gap-3 italic">
+                                <Edit2 size={20} className="text-indigo-600" /> Edit Student Registry
+                            </h2>
+                            <button onClick={() => setIsEditModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white rounded-xl text-slate-400 hover:text-slate-600 hover:shadow-md transition-all">
+                                <X size={20} />
                             </button>
                         </div>
-
-                        {/* Search in logs */}
-                        <div className="relative min-w-[300px]">
-                            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input
-                                type="text"
-                                placeholder="Filter chronological records..."
-                                value={logSearch}
-                                onChange={(e) => setLogSearch(e.target.value)}
-                                className="w-full bg-white border border-slate-200 rounded-[1.5rem] py-3.5 pl-14 pr-6 text-xs font-bold focus:shadow-xl focus:shadow-indigo-50 transition-all outline-none"
-                            />
+                        <div className="p-8 space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Student Name</label>
+                                    <input
+                                        type="text"
+                                        value={editingStudent.name}
+                                        onChange={(e) => setEditingStudent(prev => ({ ...prev, name: e.target.value }))}
+                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Grade / Level</label>
+                                    <input
+                                        type="text"
+                                        value={editingStudent.grade}
+                                        onChange={(e) => setEditingStudent(prev => ({ ...prev, grade: e.target.value }))}
+                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300 transition-all"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address</label>
+                                    <input
+                                        type="email"
+                                        value={editingStudent.email}
+                                        onChange={(e) => setEditingStudent(prev => ({ ...prev, email: e.target.value }))}
+                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone Number</label>
+                                    <input
+                                        type="text"
+                                        value={editingStudent.phone_number}
+                                        onChange={(e) => setEditingStudent(prev => ({ ...prev, phone_number: e.target.value }))}
+                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300 transition-all"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Course / Subject</label>
+                                <input
+                                    type="text"
+                                    value={editingStudent.course}
+                                    onChange={(e) => setEditingStudent(prev => ({ ...prev, course: e.target.value }))}
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300 transition-all"
+                                />
+                            </div>
+                        </div>
+                        <div className="px-8 py-6 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+                            >
+                                Discard
+                            </button>
+                            <button
+                                onClick={handleUpdateStudent}
+                                className="px-8 py-3.5 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2"
+                            >
+                                <Save size={16} /> Secure Updates
+                            </button>
                         </div>
                     </div>
                 </div>
+            )}
 
-                <div className="overflow-x-auto min-h-[500px]">
-                    {activeTab === 'student' ? (
-                        <table className="w-full text-left">
-                            <thead>
-                                <tr className="bg-slate-50/50 border-b border-slate-100">
-                                    <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Timestamp</th>
-                                    <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Student</th>
-                                    <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Engagement Mode</th>
-                                    <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Session Abstract</th>
-                                    <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Verification</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredLogs.length > 0 ? filteredLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-indigo-50/10 transition-colors group">
-                                        <td className="px-10 py-8">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                                    <Clock size={16} />
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-black text-slate-900">{new Date(log.date).toLocaleDateString()}</span>
-                                                    <span className="text-[9px] font-bold text-slate-400 uppercase">Synchronized</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-10 py-8">
-                                            <span className="text-sm font-black text-slate-700 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{log.student_name}</span>
-                                        </td>
-                                        <td className="px-10 py-8">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-2 h-2 rounded-full ${log.connected_today ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.4)] animate-pulse' : 'bg-slate-300'}`}></div>
-                                                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{log.connected_today ? 'Real-time Link' : 'Asynchronous'}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-10 py-8">
-                                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50 group-hover:bg-white transition-colors">
-                                                <p className="text-[11px] font-bold text-slate-500 line-clamp-2 max-w-xl leading-relaxed">{log.details || 'No abstract documented for this session cycle.'}</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-10 py-8 text-right">
-                                            <div className="inline-flex p-2 bg-emerald-50 rounded-xl text-emerald-600 border border-emerald-100 shadow-sm">
-                                                <CheckCircle2 size={18} />
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr>
-                                        <td colSpan="5" className="px-10 py-32 text-center text-slate-300">
-                                            <ScrollText size={48} className="mx-auto mb-4 opacity-20" />
-                                            <p className="text-[11px] font-black uppercase tracking-[0.3em]">Operational Void - No Logs Found</p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    ) : (
-                        <table className="w-full text-left">
-                            <thead>
-                                <tr className="bg-slate-50/50 border-b border-slate-100">
-                                    <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Verification Timestamp</th>
-                                    <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Academic Context</th>
-                                    <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Efficiency Rating</th>
-                                    <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Risk Vector</th>
-                                    <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Intelligence Notes</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredLogs.length > 0 ? filteredLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-purple-50/10 transition-colors group">
-                                        <td className="px-10 py-8">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all font-black text-[10px]">
-                                                    {new Date(log.date).getDate()}/{new Date(log.date).getMonth() + 1}
-                                                </div>
-                                                <span className="text-xs font-black text-slate-900">{new Date(log.date).toLocaleDateString()}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-10 py-8">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-black text-slate-700 group-hover:text-purple-600 transition-colors">{log.chapter || 'Knowledge Unit Check'}</span>
-                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{log.session_type || 'Operational'} Session</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-10 py-8 text-center">
-                                            <span className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${log.student_performance === 'Excellent' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                                    log.student_performance === 'Good' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
-                                                        log.student_performance === 'Average' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                                                            'bg-rose-50 text-rose-600 border border-rose-100'
-                                                }`}>
-                                                {log.student_performance || 'Inconclusive'}
-                                            </span>
-                                        </td>
-                                        <td className="px-10 py-8 text-center">
-                                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100">
-                                                <div className={`w-2 h-2 rounded-full ${log.issues_reported ? 'bg-rose-500 animate-ping' : 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]'}`}></div>
-                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                                    {log.issues_reported ? 'Critical Flag' : 'Stable Ops'}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-10 py-8">
-                                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50 group-hover:bg-white transition-colors">
-                                                <p className="text-[11px] font-bold text-slate-500 line-clamp-2 max-w-xl leading-relaxed">{log.issues_reported || log.topics_covered || 'No anomalies or complex topics documented for this cycle.'}</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr>
-                                        <td colSpan="5" className="px-10 py-32 text-center text-slate-300">
-                                            <ShieldCheck size={48} className="mx-auto mb-4 opacity-20" />
-                                            <p className="text-[11px] font-black uppercase tracking-[0.3em]">Verification Void - No Logs Found</p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            </div>
         </div>
     );
 };

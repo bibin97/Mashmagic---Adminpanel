@@ -42,7 +42,7 @@ const AcademicHeadDashboard = () => {
             todaySessions: 0
         },
         schedule: [],
-        recentReports: [],
+        activityFeed: [],
         examAnalytics: []
     });
 
@@ -228,7 +228,7 @@ const AcademicHeadDashboard = () => {
 
                 <div className="h-[400px] w-full relative">
                     {data.examAnalytics.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <BarChart data={data.examAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                 <XAxis
@@ -284,25 +284,25 @@ const AcademicHeadDashboard = () => {
                     </div>
 
                     <div className="space-y-6">
-                        {!data.recentReports || data.recentReports.length === 0 ? (
-                            <p className="text-center py-10 text-slate-400 font-bold italic">No intelligence reports submitted yet today.</p>
+                        {!data.activityFeed || data.activityFeed.length === 0 ? (
+                            <p className="text-center py-10 text-slate-400 font-bold italic">No intelligence activity recorded yet today.</p>
                         ) : (
-                            data.recentReports.map((report, i) => (
+                            data.activityFeed.map((activity, i) => (
                                 <div key={i} className="flex gap-6 p-6 rounded-[2rem] bg-slate-50/50 border border-slate-50 hover:border-indigo-100 hover:bg-white hover:shadow-xl transition-all duration-500 group">
-                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${report.type === 'Academic' ? 'bg-indigo-600 text-white' : 'bg-rose-500 text-white'
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${activity.type === 'Student Report' ? 'bg-indigo-600 text-white' :
+                                        activity.type === 'Student Interaction' ? 'bg-emerald-500 text-white' :
+                                            'bg-purple-600 text-white'
                                         }`}>
                                         <ClipboardList size={20} />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-start mb-1">
-                                            <h4 className="font-black text-slate-900 truncate">Report on {report.student_name}</h4>
-                                            <span className="text-[8px] font-black text-slate-300 uppercase shrink-0 ml-4">{new Date(report.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            <h4 className="font-black text-slate-900 truncate">{activity.type} for {activity.student_name}</h4>
+                                            <span className="text-[8px] font-black text-slate-300 uppercase shrink-0 ml-4">{new Date(activity.date).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</span>
                                         </div>
-                                        <p className="text-sm font-medium text-slate-600 line-clamp-1 italic mb-2">"{report.remarks}"</p>
+                                        <p className="text-sm font-medium text-slate-600 line-clamp-1 italic mb-2">"{activity.details || 'No details'}"</p>
                                         <div className="flex items-center gap-3">
-                                            <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">Lead: {report.faculty_name}</span>
-                                            <div className="w-1 h-1 bg-slate-200 rounded-full"></div>
-                                            <span className={`text-[9px] font-black uppercase tracking-widest ${report.status === 'Open' ? 'text-amber-500' : 'text-emerald-500'}`}>{report.status} Phase</span>
+                                            <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">By: {activity.origin_name}</span>
                                         </div>
                                     </div>
                                 </div>

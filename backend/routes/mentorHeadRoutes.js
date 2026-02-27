@@ -14,11 +14,18 @@ const {
     uncheckStudent,
     getDailySummary,
     getAllStudents,
-    editMentor,
-    deleteMentor,
     getMentorInteractionLogs,
     getFacultyIntelligenceLogs,
-    getExamAnalytics
+    getExamAnalytics,
+    editStudent,
+    deleteStudent,
+    getFaculties,
+    editFaculty,
+    deleteFaculty,
+    getMentors,
+    getStudents,
+    editMentor,
+    deleteMentor
 } = require('../controllers/mentorHeadController');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { requireRole } = require('../middleware/roleMiddleware');
@@ -48,7 +55,18 @@ router.get('/exam-analytics', getExamAnalytics);
 router.get('/mentor-logs', getMentorInteractionLogs);
 router.get('/faculty-intelligence', getFacultyIntelligenceLogs);
 
-// Edit & Delete Mentor
+// Faculty Management for Mentor Head
+router.get('/faculties-all', getFaculties);
+router.put('/faculties/:id', editFaculty);
+router.delete('/faculties/:id', deleteFaculty);
+
+// Student Management for Mentor Head (Unified)
+router.get('/students-all', getStudents);
+router.put('/students/:id', editStudent);
+router.delete('/students/:id', deleteStudent);
+
+// Mentor Management for Mentor Head (Unified)
+router.get('/mentors-all', getMentors);
 router.put('/mentors/:mentorId', editMentor);
 router.delete('/mentors/:mentorId', deleteMentor);
 

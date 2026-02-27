@@ -363,6 +363,9 @@ const createStudentLog = async (req, res) => {
             screenshot_url
         ]);
 
+        // Notify Admin/Academic Head
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Mentor (${req.user.name}) submitted a new Student Interaction Log for ${student_id}`]);
+
         res.status(201).json({ success: true, message: "Student interaction log saved successfully", session_number: nextSessionNumber });
     } catch (error) {
         console.error("Create Log Error:", error);
@@ -414,6 +417,9 @@ const createFacultyLog = async (req, res) => {
             issues_reported, risk_level, remedial_plan, parent_update_needed === 'Yes' ? 1 : 0,
             faculty_intervention_required, notes, screenshot_url
         ]);
+
+        // Notify Admin/Academic Head
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Mentor (${req.user.name}) submitted a new Faculty Interaction Log for student ${student_id}`]);
 
         res.status(201).json({ success: true, message: "Faculty interaction log saved", session_number: finalSessionNumber });
     } catch (error) {

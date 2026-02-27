@@ -26,14 +26,24 @@ const getDashboardStats = async (req, res) => {
             ORDER BY tt.start_time ASC
         `, [today]);
 
-        // 3. Newest Actions/Reports from Faculties
-        const [recentReports] = await db.query(`
-            SELECT r.*, s.name as student_name, u.name as faculty_name 
-            FROM student_reports r 
-            JOIN students s ON r.student_id = s.id 
-            JOIN users u ON r.faculty_id = u.id 
-            ORDER BY r.created_at DESC 
-            LIMIT 5
+        // 3. Activity Feed (Merged Intelligence from all logs)
+        const [activityFeed] = await db.query(`
+            (SELECT 'Student Report' as type, r.remarks as details, s.name as student_name, u.name as origin_name, r.created_at as date
+             FROM student_reports r 
+             JOIN students s ON r.student_id = s.id 
+             JOIN users u ON r.faculty_id = u.id)
+            UNION ALL
+            (SELECT 'Student Interaction' as type, sil.mentor_notes as details, s.name as student_name, u.name as origin_name, sil.created_at as date
+             FROM student_interaction_logs sil
+             JOIN students s ON sil.student_id = s.id
+             JOIN users u ON sil.mentor_id = u.id)
+            UNION ALL
+            (SELECT 'Faculty Interaction' as type, fil.notes as details, s.name as student_name, u.name as origin_name, fil.created_at as date
+             FROM faculty_interaction_logs fil
+             JOIN students s ON fil.student_id = s.id
+             JOIN users u ON fil.mentor_id = u.id)
+            ORDER BY date DESC
+            LIMIT 10
         `);
 
         res.status(200).json({
@@ -46,7 +56,7 @@ const getDashboardStats = async (req, res) => {
                     todaySessions: schedule.length
                 },
                 schedule,
-                recentReports
+                activityFeed
             }
         });
     } catch (error) {
@@ -464,7 +474,7 @@ const uncheckFacultySession = async (req, res) => {
 const getFacultyDirectory = async (req, res) => {
     try {
         const [faculties] = await db.query(`
-            SELECT id, name, email, phone_number, status, created_at 
+            SELECT id, name, email, phone_number, status, createdAt 
             FROM users 
             WHERE role = "faculty" 
             ORDER BY name ASC
@@ -679,7 +689,89 @@ module.exports = {
     getLiveClassEvaluations,
     submitLiveClassEvaluation,
     getPendingFacultyLogs,
-    verifyFacultyLog
+    verifyFacultyLog,
+    // New Edit/Delete functionalities
+    editFaculty: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { name, email, phone_number, place } = req.body;
+            const [[user]] = await db.query('SELECT name FROM users WHERE id = ?', [id]);
+            await db.query('UPDATE users SET name = ?, email = ?, phone_number = ?, place = ? WHERE id = ?', [name, email, phone_number, place, id]);
+            await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Academic Head (${req.user.name}) edited faculty: ${user.name}`]);
+            res.status(200).json({ success: true, message: 'Faculty updated' });
+        } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    },
+    deleteFaculty: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const [[user]] = await db.query('SELECT name FROM users WHERE id = ?', [id]);
+            await db.query('DELETE FROM users WHERE id = ?', [id]);
+            await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Academic Head (${req.user.name}) deleted faculty: ${user.name}`]);
+            res.status(200).json({ success: true, message: 'Faculty deleted' });
+        } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    },
+    editStudent: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { name, grade, subject, course } = req.body;
+            const [[student]] = await db.query('SELECT name FROM students WHERE id = ?', [id]);
+            await db.query('UPDATE students SET name = ?, grade = ?, subject = ?, course = ? WHERE id = ?', [name, grade, subject, course, id]);
+            await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Academic Head (${req.user.name}) edited student: ${student.name}`]);
+            res.status(200).json({ success: true, message: 'Student updated' });
+        } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    },
+    deleteStudent: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const [[student]] = await db.query('SELECT name FROM students WHERE id = ?', [id]);
+            await db.query('DELETE FROM students WHERE id = ?', [id]);
+            await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Academic Head (${req.user.name}) deleted student: ${student.name}`]);
+            res.status(200).json({ success: true, message: 'Student deleted' });
+        } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    },
+    getStudents: async (req, res) => {
+        try {
+            const [rows] = await db.query(`
+                SELECT s.*, u_m.name as mentor_name, u_f.name as faculty_name 
+                FROM students s
+                LEFT JOIN users u_m ON s.mentor_id = u_m.id
+                LEFT JOIN users u_f ON s.faculty_id = u_f.id
+                ORDER BY s.created_at DESC
+            `);
+            res.status(200).json({ success: true, data: rows });
+        } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    },
+    getMentors: async (req, res) => {
+        try {
+            const [rows] = await db.query(`
+                SELECT u.id, u.name, u.email, u.phone_number, u.place, u.status, u.createdAt,
+                (SELECT COUNT(*) FROM students WHERE mentor_id = u.id) as studentCount
+                FROM users u
+                WHERE u.role = 'mentor'
+                ORDER BY u.name ASC
+            `);
+            res.status(200).json({ success: true, data: rows });
+        } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    },
+    editMentor: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { name, email, phone_number, place } = req.body;
+            const [[user]] = await db.query('SELECT name FROM users WHERE id = ?', [id]);
+            await db.query('UPDATE users SET name = ?, email = ?, phone_number = ?, place = ? WHERE id = ?', [name, email, phone_number, place, id]);
+            await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Academic Head (${req.user.name}) edited mentor: ${user.name}`]);
+            res.status(200).json({ success: true, message: 'Mentor profile updated' });
+        } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    },
+    deleteMentor: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const [[user]] = await db.query('SELECT name FROM users WHERE id = ?', [id]);
+            await db.query('DELETE FROM users WHERE id = ?', [id]);
+            await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Academic Head (${req.user.name}) deleted mentor: ${user.name}`]);
+            res.status(200).json({ success: true, message: 'Mentor profile purged' });
+        } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    }
 };
 
 

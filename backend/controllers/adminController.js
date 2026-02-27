@@ -33,17 +33,23 @@ const getUserById = async (req, res) => {
 const approveUser = async (req, res) => {
     try {
         const { role } = req.body;
+        const { id } = req.params;
         let result;
+        let nameRow;
 
         if (role === 'student') {
-            [result] = await db.query('UPDATE students SET status = "active", isApproved = 1 WHERE id = ?', [req.params.id]);
+            [[nameRow]] = await db.query('SELECT name FROM students WHERE id = ?', [id]);
+            [result] = await db.query('UPDATE students SET status = "active", isApproved = 1 WHERE id = ?', [id]);
         } else {
-            [result] = await db.query('UPDATE users SET status = "active", isApproved = 1, isActive = 1 WHERE id = ?', [req.params.id]);
+            [[nameRow]] = await db.query('SELECT name FROM users WHERE id = ?', [id]);
+            [result] = await db.query('UPDATE users SET status = "active", isApproved = 1, isActive = 1 WHERE id = ?', [id]);
         }
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: "User/Student not found" });
         }
+
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Admin (${req.user.name}) approved ${role}: ${nameRow?.name || id}`]);
         res.status(200).json({ success: true, message: "Approved successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: "Server Error", error: error.message });
@@ -56,17 +62,23 @@ const approveUser = async (req, res) => {
 const blockUser = async (req, res) => {
     try {
         const role = req.body.role || req.query.role;
+        const { id } = req.params;
         let result;
+        let nameRow;
 
         if (role === 'student') {
-            [result] = await db.query('UPDATE students SET status = "inactive" WHERE id = ?', [req.params.id]);
+            [[nameRow]] = await db.query('SELECT name FROM students WHERE id = ?', [id]);
+            [result] = await db.query('UPDATE students SET status = "inactive" WHERE id = ?', [id]);
         } else {
-            [result] = await db.query('UPDATE users SET status = "inactive" WHERE id = ?', [req.params.id]);
+            [[nameRow]] = await db.query('SELECT name FROM users WHERE id = ?', [id]);
+            [result] = await db.query('UPDATE users SET status = "inactive" WHERE id = ?', [id]);
         }
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: "User not found" });
         }
+
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Admin (${req.user.name}) blocked ${role}: ${nameRow?.name || id}`]);
         res.status(200).json({ success: true, message: "User blocked successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: "Server Error", error: error.message });
@@ -139,17 +151,23 @@ const rejectUser = async (req, res) => {
 const deleteUser = async (req, res) => {
     try {
         const role = req.query.role || req.body.role;
+        const { id } = req.params;
         let result;
+        let nameRow;
 
         if (role === 'student') {
-            [result] = await db.query('DELETE FROM students WHERE id = ?', [req.params.id]);
+            [[nameRow]] = await db.query('SELECT name FROM students WHERE id = ?', [id]);
+            [result] = await db.query('DELETE FROM students WHERE id = ?', [id]);
         } else {
-            [result] = await db.query('DELETE FROM users WHERE id = ?', [req.params.id]);
+            [[nameRow]] = await db.query('SELECT name FROM users WHERE id = ?', [id]);
+            [result] = await db.query('DELETE FROM users WHERE id = ?', [id]);
         }
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: "User not found" });
         }
+
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Admin (${req.user.name}) deleted ${role}: ${nameRow?.name || id}`]);
         res.status(200).json({ success: true, message: "User deleted successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: "Server Error", error: error.message });
@@ -258,6 +276,8 @@ const updateStudentForAdmin = async (req, res) => {
         const { id } = req.params;
         const { name, grade, subject, timetable, nextInstallment, status } = req.body;
 
+        const [[oldStudent]] = await db.query('SELECT name FROM students WHERE id = ?', [id]);
+
         const [result] = await db.query(
             'UPDATE students SET name = ?, grade = ?, subject = ?, time_table = ?, next_installment_date = ?, status = ? WHERE id = ?',
             [name, grade, subject, timetable, nextInstallment, status, id]
@@ -267,6 +287,7 @@ const updateStudentForAdmin = async (req, res) => {
             return res.status(404).json({ success: false, message: "Student not found" });
         }
 
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Admin (${req.user.name}) updated student: ${oldStudent?.name || id}`]);
         res.status(200).json({ success: true, message: "Student updated successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: "Server Error", error: error.message });
@@ -280,6 +301,8 @@ const updateUserForAdmin = async (req, res) => {
         const { id } = req.params;
         const { name, email, phone_number, status, role } = req.body;
 
+        const [[oldUser]] = await db.query('SELECT name FROM users WHERE id = ?', [id]);
+
         const [result] = await db.query(
             'UPDATE users SET name = ?, email = ?, phone_number = ?, status = ?, role = ? WHERE id = ?',
             [name, email, phone_number, status, role, id]
@@ -289,6 +312,7 @@ const updateUserForAdmin = async (req, res) => {
             return res.status(404).json({ success: false, message: "User not found" });
         }
 
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Admin (${req.user.name}) updated ${role}: ${oldUser?.name || id}`]);
         res.status(200).json({ success: true, message: "User updated successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: "Server Error", error: error.message });
@@ -525,6 +549,59 @@ module.exports = {
             res.status(200).json({ success: true, data: rows });
         } catch (error) {
             console.error('Error fetching exam analytics:', error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    },
+    // @desc    Get mentor student distribution
+    // @route   GET /api/admin/mentor-distribution
+    getMentorDistribution: async (req, res) => {
+        try {
+            const [rows] = await db.query(`
+                SELECT 
+                    u.name as mentor_name,
+                    (SELECT COUNT(*) FROM students s WHERE s.mentor_id = u.id AND s.status = 'active') as student_count
+                FROM users u
+                WHERE u.role = 'mentor' AND u.status = 'active'
+                HAVING student_count > 0
+                ORDER BY student_count DESC
+            `);
+            res.status(200).json({ success: true, data: rows });
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    },
+    // @desc    Get task performance analytics
+    // @route   GET /api/admin/task-analytics
+    getTaskAnalytics: async (req, res) => {
+        try {
+            const days = parseInt(req.query.days);
+            // If days is 0 (Today), we still want at least 1 row.
+            const interval = isNaN(days) ? 6 : days;
+
+            const [rows] = await db.query(`
+                WITH RECURSIVE dates AS (
+                    SELECT CURDATE() as date_val
+                    UNION ALL
+                    SELECT DATE_SUB(date_val, INTERVAL 1 DAY)
+                    FROM dates
+                    WHERE date_val > DATE_SUB(CURDATE(), INTERVAL ? DAY)
+                )
+                SELECT 
+                    CASE 
+                        WHEN ? <= 6 THEN DATE_FORMAT(d.date_val, '%a')
+                        WHEN ? <= 30 THEN DATE_FORMAT(d.date_val, '%b %d')
+                        ELSE DATE_FORMAT(d.date_val, '%b %d')
+                    END as name,
+                    d.date_val as date,
+                    COALESCE(COUNT(t.id), 0) as tasks,
+                    COALESCE(SUM(CASE WHEN (t.status = 'Completed' OR t.status = 'Success') THEN 1 ELSE 0 END), 0) as completed
+                FROM dates d
+                LEFT JOIN tasks t ON DATE(t.created_at) = d.date_val
+                GROUP BY d.date_val
+                ORDER BY d.date_val ASC
+            `, [interval, interval, interval]);
+            res.status(200).json({ success: true, data: rows });
+        } catch (error) {
             res.status(500).json({ success: false, message: error.message });
         }
     }

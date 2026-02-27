@@ -23,7 +23,9 @@ const {
     deleteSubAdmin,
     updateStudentForAdmin,
     updateUserForAdmin,
-    getExamAnalytics
+    getExamAnalytics,
+    getMentorDistribution,
+    getTaskAnalytics
 } = require('../controllers/adminController');
 const { getDailyHours } = require('../controllers/mentorController');
 const { requireAuth } = require('../middleware/authMiddleware');
@@ -36,16 +38,26 @@ const { requireRole } = require('../middleware/roleMiddleware');
 // The existing file had `requireRole('super_admin', 'admin')`. I will keep it.
 
 router.use(requireAuth);
-router.use(requireRole('super_admin', 'admin'));
+// General view access for admin and super_admin
+router.get('/pending-users', requireRole('super_admin', 'admin'), getPendingUsers);
+router.get('/users', requireRole('super_admin', 'admin'), getUsers);
+router.get('/students', requireRole('super_admin', 'admin'), getAllStudentsForAdmin);
+router.get('/mentors', requireRole('super_admin', 'admin'), getAllMentorsForAdmin);
+router.get('/faculties', requireRole('super_admin', 'admin'), getAllFacultiesForAdmin);
+router.get('/staff', requireRole('super_admin', 'admin'), getStaffMembers);
+router.get('/users/:id', requireRole('super_admin', 'admin'), getUserById);
+router.get('/student-logs', requireRole('super_admin', 'admin'), getAllStudentLogs);
+router.get('/faculty-logs', requireRole('super_admin', 'admin'), getAllFacultyLogs);
+router.get('/notifications', requireRole('super_admin', 'admin'), getAdminNotifications);
+router.get('/mentor-head-report', requireRole('super_admin', 'admin'), getDailyMentorHeadReport);
+router.get('/exam-analytics', requireRole('super_admin', 'admin'), getExamAnalytics);
+router.get('/mentor-distribution', requireRole('super_admin', 'admin'), getMentorDistribution);
+router.get('/task-analytics', requireRole('super_admin', 'admin'), getTaskAnalytics);
 
-router.get('/pending-users', getPendingUsers); // Fetch pending requests
-router.put('/reject/:id', rejectUser); // Reject request
-router.get('/users', getUsers);
-router.get('/students', getAllStudentsForAdmin);
-router.get('/mentors', getAllMentorsForAdmin);
-router.get('/faculties', getAllFacultiesForAdmin);
-router.get('/staff', getStaffMembers);
-router.get('/users/:id', getUserById);
+// Management & Destructive actions restricted to Super Admin only
+router.use(requireRole('super_admin'));
+
+router.put('/reject/:id', rejectUser);
 router.put('/approve/:id', approveUser);
 router.put('/block/:id', blockUser);
 router.delete('/delete/:id', deleteUser);
@@ -64,8 +76,8 @@ router.get('/faculty-logs', getAllFacultyLogs);
 router.get('/daily-hours/:studentId', getDailyHours);
 
 // Mentor Head Report
-router.get('/mentor-head-report', getDailyMentorHeadReport);
-router.get('/exam-analytics', getExamAnalytics);
+// router.get('/mentor-head-report', getDailyMentorHeadReport); // Handled above
+// router.get('/exam-analytics', getExamAnalytics); // Handled above
 
 // Notifications
 router.get('/notifications', getAdminNotifications);

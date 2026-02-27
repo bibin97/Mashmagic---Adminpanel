@@ -127,7 +127,7 @@ const FacultyDashboard = () => {
                     </div>
                     <div className="h-[300px] w-full relative">
                         {mounted && stats && (
-                            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                 <BarChart data={stats?.charts?.performance || []}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis
@@ -170,7 +170,7 @@ const FacultyDashboard = () => {
                     </div>
                     <div className="h-[300px] w-full relative">
                         {mounted && stats && (
-                            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                 <LineChart data={stats?.charts?.attendance || []}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis

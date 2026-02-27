@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../services/api';
 import {
     Calendar,
     Target,
@@ -22,10 +22,7 @@ const DailyMentorHeadReport = () => {
     const fetchReport = async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:5000/api/admin/mentor-head-report?date=${filterDate}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await api.get(`/admin/mentor-head-report?date=${filterDate}`);
 
             if (res.data.success) {
                 setReportData(res.data.data);

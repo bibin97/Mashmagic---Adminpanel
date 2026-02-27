@@ -4,8 +4,11 @@ import Modal from '../../components/Modal';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { Users, ListTodo, TrendingUp } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const Mentors = () => {
+    const { user } = useAuth();
+    const isSuperAdmin = user?.role === 'super_admin';
     const [mentors, setMentors] = useState([]);
     const [filteredMentors, setFilteredMentors] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -152,10 +155,10 @@ const Mentors = () => {
                 loading={loading}
                 onSearch={handleSearch}
                 onView={handleView}
-                onApprove={handleApprove}
-                onBlock={handleBlock}
-                onDelete={handleDelete}
-                onEdit={handleEdit}
+                onApprove={isSuperAdmin ? handleApprove : undefined}
+                onBlock={isSuperAdmin ? handleBlock : undefined}
+                onDelete={isSuperAdmin ? handleDelete : undefined}
+                onEdit={isSuperAdmin ? handleEdit : undefined}
                 searchPlaceholder="Filter mentors by name or email..."
             />
 

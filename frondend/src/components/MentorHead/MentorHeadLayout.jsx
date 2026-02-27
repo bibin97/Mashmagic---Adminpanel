@@ -11,7 +11,9 @@ import {
     ShieldCheck,
     Activity,
     Target,
-    ListTodo
+    ListTodo,
+    GraduationCap,
+    Briefcase
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -25,6 +27,8 @@ const MentorHeadLayout = () => {
         { path: '/mentor-head/shift', icon: <ShieldCheck className="w-[18px] h-[18px]" />, label: 'Student Shift' },
         { path: '/mentor-head/register-mentor', icon: <UserPlus size={18} />, label: 'Register Mentor' },
         { path: '/mentor-head/mentors', icon: <Users size={18} />, label: 'Mentors List' },
+        { path: '/mentor-head/students', icon: <GraduationCap size={18} />, label: 'Students' },
+        { path: '/mentor-head/faculties', icon: <Briefcase size={18} />, label: 'Faculties' },
         { path: '/mentor-head/tasks', icon: <ListTodo size={18} />, label: 'Tasks' },
         { path: '/mentor-head/interactions', icon: <Activity size={18} />, label: 'Logs' },
     ];

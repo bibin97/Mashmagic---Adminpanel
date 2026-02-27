@@ -59,30 +59,25 @@ exports.registerMentor = async (req, res) => {
 // @desc    Update a mentor's details (Handover account)
 // @route   PUT /api/mentor-head/mentors/:mentorId
 // @access  Private (Mentor Head)
+// Consolidated version of editMentor moved to bottom for cleanliness, or just kept here. I'll keep one here and remove the others.
 exports.editMentor = async (req, res) => {
     try {
         const id = req.params.mentorId || req.params.id;
         const { name, email, phone_number, place, password } = req.body;
 
-        // Validation
         if (!name || !email || !phone_number) {
-            return res.status(400).json({
-                success: false,
-                message: "Name, email, and phone number are required fields"
-            });
+            return res.status(400).json({ success: false, message: "Name, email, and phone number are required fields" });
         }
 
-        // Check if trying to use another mentor's email or phone
         const [existingPhone] = await db.query('SELECT id FROM users WHERE phone_number = ? AND id != ?', [phone_number, id]);
         const [existingEmail] = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, id]);
 
-        if (existingPhone.length > 0) return res.status(400).json({ success: false, message: "Phone number already in use by another user" });
-        if (existingEmail.length > 0) return res.status(400).json({ success: false, message: "Email already in use by another user" });
+        if (existingPhone.length > 0) return res.status(400).json({ success: false, message: "Phone number already in use" });
+        if (existingEmail.length > 0) return res.status(400).json({ success: false, message: "Email already in use" });
 
         let query = 'UPDATE users SET name = ?, email = ?, phone_number = ?, place = ?';
         let params = [name, email, phone_number, place || ''];
 
-        // If a new password is provided, update that too
         if (password) {
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(password, salt);
@@ -94,12 +89,10 @@ exports.editMentor = async (req, res) => {
         params.push(id);
 
         const [result] = await db.query(query, params);
+        if (result.affectedRows === 0) return res.status(404).json({ success: false, message: "Mentor not found" });
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ success: false, message: "Mentor not found or update failed" });
-        }
-
-        res.status(200).json({ success: true, message: "Mentor details updated successfully" });
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Mentor Head (${req.user.name}) updated mentor: ${name}`]);
+        res.status(200).json({ success: true, message: "Mentor updated successfully" });
     } catch (error) {
         console.error('Error updating mentor:', error);
         res.status(500).json({ success: false, message: "Server Error", error: error.message });
@@ -228,17 +221,30 @@ exports.getFacultyIntelligenceLogs = async (req, res) => {
 exports.getAllActivities = async (req, res) => {
     try {
         const query = `
-            SELECT 
+            (SELECT 
                 sil.id as log_id,
                 sil.date,
                 sil.mentor_notes as details,
                 s.name as student_name,
                 m.name as mentor_name,
-                m.place as mentor_place
+                m.place as mentor_place,
+                'Mentor Interaction' as type
             FROM student_interaction_logs sil
             JOIN students s ON s.id = sil.student_id
-            JOIN users m ON m.id = sil.mentor_id
-            ORDER BY sil.date DESC
+            JOIN users m ON m.id = sil.mentor_id)
+            UNION ALL
+            (SELECT 
+                fil.id as log_id,
+                fil.date,
+                fil.notes as details,
+                s.name as student_name,
+                m.name as mentor_name,
+                m.place as mentor_place,
+                'Faculty Interaction' as type
+            FROM faculty_interaction_logs fil
+            JOIN students s ON s.id = fil.student_id
+            JOIN users m ON m.id = fil.mentor_id)
+            ORDER BY date DESC
             LIMIT 50
         `;
 
@@ -552,19 +558,14 @@ exports.deleteMentor = async (req, res) => {
         const { mentorId } = req.params;
         const mentorHeadName = req.user.name || 'Mentor Head';
 
-        // Check mentor details for the log
         const [mentor] = await db.query('SELECT name FROM users WHERE id = ? AND role = "mentor"', [mentorId]);
         if (mentor.length === 0) return res.status(404).json({ success: false, message: 'Mentor not found' });
 
         const mentorName = mentor[0].name;
 
-        // Delete Mentor
+        await db.query('UPDATE students SET mentor_id = NULL WHERE mentor_id = ?', [mentorId]);
         await db.query('DELETE FROM users WHERE id = ? AND role = "mentor"', [mentorId]);
 
-        // Unassign mentor from students
-        await db.query('UPDATE students SET mentor_id = NULL WHERE mentor_id = ?', [mentorId]);
-
-        // Notify Admin
         const msg = `${mentorHeadName} deleted mentor: ${mentorName}`;
         try {
             await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [msg]);
@@ -572,6 +573,7 @@ exports.deleteMentor = async (req, res) => {
 
         res.status(200).json({ success: true, message: 'Mentor deleted successfully' });
     } catch (error) {
+        console.error('Error deleting mentor:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -596,3 +598,73 @@ exports.getExamAnalytics = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+exports.editStudent = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, grade, subject, course } = req.body;
+        const [[student]] = await db.query('SELECT name FROM students WHERE id = ?', [id]);
+        await db.query('UPDATE students SET name = ?, grade = ?, subject = ?, course = ? WHERE id = ?', [name, grade, subject, course, id]);
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Mentor Head (${req.user.name}) edited student: ${student.name}`]);
+        res.status(200).json({ success: true, message: 'Student updated' });
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+exports.deleteStudent = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [[student]] = await db.query('SELECT name FROM students WHERE id = ?', [id]);
+        await db.query('DELETE FROM students WHERE id = ?', [id]);
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Mentor Head (${req.user.name}) deleted student: ${student.name}`]);
+        res.status(200).json({ success: true, message: 'Student deleted' });
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+exports.getFaculties = async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT id, name, email, phone_number, place, status, createdAt FROM users WHERE role = "faculty" ORDER BY name ASC');
+        res.status(200).json({ success: true, data: rows });
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+exports.getStudents = async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT s.*, m.name as mentor_name, f.name as faculty_name FROM students s LEFT JOIN users m ON s.mentor_id = m.id LEFT JOIN users f ON s.faculty_id = f.id ORDER BY s.created_at DESC');
+        res.status(200).json({ success: true, data: rows });
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+exports.editFaculty = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, email, phone_number, place } = req.body;
+        const [[user]] = await db.query('SELECT name FROM users WHERE id = ?', [id]);
+        await db.query('UPDATE users SET name = ?, email = ?, phone_number = ?, place = ? WHERE id = ?', [name, email, phone_number, place, id]);
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Mentor Head (${req.user.name}) edited faculty: ${user.name}`]);
+        res.status(200).json({ success: true, message: 'Faculty updated' });
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+exports.deleteFaculty = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [[user]] = await db.query('SELECT name FROM users WHERE id = ?', [id]);
+        await db.query('DELETE FROM users WHERE id = ?', [id]);
+        await db.query('INSERT INTO admin_notifications (message) VALUES (?)', [`Mentor Head (${req.user.name}) deleted faculty: ${user.name}`]);
+        res.status(200).json({ success: true, message: 'Faculty deleted' });
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+exports.getMentors = async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT u.id, u.name, u.email, u.phone_number, u.place, u.status,
+            (SELECT COUNT(*) FROM students WHERE mentor_id = u.id) as studentCount
+            FROM users u WHERE u.role = 'mentor' ORDER BY u.name ASC
+        `);
+        res.status(200).json({ success: true, data: rows });
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
+// End of file cleanup
+

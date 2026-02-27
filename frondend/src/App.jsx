@@ -68,11 +68,17 @@ import AcademicHeadTasks from './pages/AcademicHead/AcademicHeadTasks';
 import AcademicHeadFacultyActivity from './pages/AcademicHead/AcademicHeadFacultyActivity';
 import AcademicActions from './pages/AcademicHead/AcademicActions';
 import FacultyDirectory from './pages/AcademicHead/FacultyDirectory';
+import StudentsListAcademic from './pages/AcademicHead/StudentsList';
+import MentorsListAcademic from './pages/AcademicHead/MentorsList';
 import Documents from './pages/AcademicHead/Documents';
 import FacultyAudit from './pages/AcademicHead/FacultyAudit';
 import StudentLogsAcademic from './pages/AcademicHead/StudentLogs';
 import FacultyLogsAcademic from './pages/AcademicHead/FacultyLogs';
 import CheckingSection from './pages/AcademicHead/CheckingSection';
+
+// Mentor Head Additional Pages
+import FacultyDirectoryMentorHead from './pages/MentorHead/FacultyDirectory';
+import StudentsListMentorHead from './pages/AcademicHead/StudentsList'; // Reusing StudentsList logic for AH/MH if compatible, or I'll create a dedicated one if needed. Actually I created StudentsList.jsx in AH, I should check if it's reusable.
 
 // Academic Counselor Pages
 import AcademicCounselorLayout from './components/AcademicCounselor/AcademicCounselorLayout';
@@ -130,6 +136,8 @@ function App() {
             <Route path="register-mentor" element={<MentorRegistration />} />
             <Route path="mentors" element={<MentorsList />} />
             <Route path="mentors/:id" element={<MentorDetails />} />
+            <Route path="students" element={<StudentsListAcademic role="mentor_head" />} /> {/* Route for student management */}
+            <Route path="faculties" element={<FacultyDirectoryMentorHead />} />
             <Route path="tasks" element={<MentorHeadTasks />} />
             <Route path="interactions" element={<MentorHeadInteractions />} />
           </Route>
@@ -144,6 +152,8 @@ function App() {
             <Route path="dashboard" element={<AcademicHeadDashboard />} />
             <Route path="actions" element={<AcademicActions />} />
             <Route path="faculties" element={<FacultyDirectory />} />
+            <Route path="students" element={<StudentsListAcademic role="academic_head" />} />
+            <Route path="mentors" element={<MentorsListAcademic />} />
             <Route path="documents" element={<Documents />} />
             <Route path="faculty-audit" element={<FacultyAudit />} />
             <Route path="registrations" element={<Registrations />} />

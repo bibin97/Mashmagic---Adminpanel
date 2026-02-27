@@ -4,7 +4,7 @@ import {
     Users, User, Mail, Phone, Calendar,
     Clock, List, ChevronDown, ChevronUp, Search,
     Briefcase, GraduationCap, ArrowRight, ExternalLink,
-    Filter, Activity
+    Filter, Activity, Edit2, Trash2, X, Save
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -13,6 +13,8 @@ const FacultyDirectory = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedFaculty, setExpandedFaculty] = useState(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingFaculty, setEditingFaculty] = useState(null);
 
     useEffect(() => {
         fetchFaculties();
@@ -26,6 +28,37 @@ const FacultyDirectory = () => {
             toast.error("Failed to load faculty directory");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleEditFaculty = (faculty) => {
+        setEditingFaculty({ ...faculty });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateFaculty = async () => {
+        try {
+            const res = await api.put(`/academic-head/faculties/${editingFaculty.id}`, editingFaculty);
+            if (res.data.success) {
+                toast.success("Faculty record updated successfully");
+                setIsEditModalOpen(false);
+                fetchFaculties();
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Update operation failed");
+        }
+    };
+
+    const handleDeleteFaculty = async (id) => {
+        if (!window.confirm("PERMANENT ACTION: Delete this faculty registry? This cannot be undone.")) return;
+        try {
+            const res = await api.delete(`/academic-head/faculties/${id}`);
+            if (res.data.success) {
+                toast.success("Faculty record purged from system");
+                fetchFaculties();
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Failed to delete faculty");
         }
     };
 
@@ -98,10 +131,26 @@ const FacultyDirectory = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="text-right flex flex-col items-end gap-3">
                                         <div className="bg-indigo-50 px-4 py-3 rounded-2xl border border-indigo-100 text-center min-w-[100px]">
                                             <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">Assigned</p>
                                             <p className="text-lg font-black text-indigo-700 italic">{faculty.studentCount} Students</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleEditFaculty(faculty)}
+                                                className="p-2.5 bg-white border border-slate-200 rounded-xl text-blue-600 hover:bg-blue-50 transition-all shadow-sm"
+                                                title="Edit Faculty"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteFaculty(faculty.id)}
+                                                className="p-2.5 bg-white border border-slate-200 rounded-xl text-rose-600 hover:bg-rose-50 transition-all shadow-sm"
+                                                title="Delete Faculty"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -193,6 +242,76 @@ const FacultyDirectory = () => {
                             )}
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Faculty Edit Modal */}
+            {isEditModalOpen && editingFaculty && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-4 duration-300 border border-white/20">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h2 className="text-lg font-black text-slate-900 flex items-center gap-3 italic">
+                                <Edit2 size={20} className="text-indigo-600" /> Edit Faculty Profile
+                            </h2>
+                            <button onClick={() => setIsEditModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white rounded-xl text-slate-400 hover:text-slate-600 hover:shadow-md transition-all">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Full Name</label>
+                                <input
+                                    type="text"
+                                    value={editingFaculty.name}
+                                    onChange={(e) => setEditingFaculty(prev => ({ ...prev, name: e.target.value }))}
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300 transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address</label>
+                                <input
+                                    type="email"
+                                    value={editingFaculty.email}
+                                    onChange={(e) => setEditingFaculty(prev => ({ ...prev, email: e.target.value }))}
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300 transition-all"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone Number</label>
+                                    <input
+                                        type="text"
+                                        value={editingFaculty.phone_number || ''}
+                                        onChange={(e) => setEditingFaculty(prev => ({ ...prev, phone_number: e.target.value }))}
+                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Place / City</label>
+                                    <input
+                                        type="text"
+                                        value={editingFaculty.place || ''}
+                                        onChange={(e) => setEditingFaculty(prev => ({ ...prev, place: e.target.value }))}
+                                        className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-300 transition-all"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-8 py-6 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+                            >
+                                Discard
+                            </button>
+                            <button
+                                onClick={handleUpdateFaculty}
+                                className="px-8 py-3.5 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center gap-2"
+                            >
+                                <Save size={16} /> Update Faculty
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

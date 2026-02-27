@@ -20,7 +20,16 @@ const {
     getLiveClassEvaluations,
     submitLiveClassEvaluation,
     getPendingFacultyLogs,
-    verifyFacultyLog
+    verifyFacultyLog,
+    getExamAnalytics,
+    editFaculty,
+    deleteFaculty,
+    editStudent,
+    deleteStudent,
+    getStudents,
+    getMentors,
+    editMentor,
+    deleteMentor
 } = require('../controllers/academicHeadController');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { requireRole } = require('../middleware/roleMiddleware');
@@ -30,6 +39,7 @@ router.use(requireAuth);
 router.use(requireRole('academic_head'));
 
 router.get('/dashboard', getDashboardStats);
+router.get('/exam-analytics', getExamAnalytics);
 router.get('/actions', getAcademicActions);
 router.get('/faculties', getFacultyDirectory);
 router.get('/documents', getAcademicDocuments);
@@ -51,5 +61,17 @@ router.get('/live-class-evaluations', getLiveClassEvaluations);
 router.post('/live-class-evaluations', submitLiveClassEvaluation);
 router.get('/faculty-logs-pending', getPendingFacultyLogs);
 router.put('/faculty-logs/:id/verify', verifyFacultyLog);
+
+// New Management Routes
+router.put('/faculties/:id', editFaculty);
+router.delete('/faculties/:id', deleteFaculty);
+router.put('/students/:id', editStudent);
+router.delete('/students/:id', deleteStudent);
+
+// Management Lists
+router.get('/students-all', getStudents);
+router.get('/mentors-all', getMentors);
+router.put('/mentors/:id', editMentor);
+router.delete('/mentors/:id', deleteMentor);
 
 module.exports = router;
