@@ -268,14 +268,14 @@ const Dashboard = () => {
                                         <Bar
                                             name="Tasks"
                                             dataKey="tasks"
-                                            fill="#f59e0b"
+                                            fill="#475569"
                                             radius={[4, 4, 0, 0]}
                                             barSize={taskPerformance.length > 30 ? 8 : (taskPerformance.length > 14 ? 12 : 25)}
                                         />
                                         <Bar
                                             name="Task Completed"
                                             dataKey="completed"
-                                            fill="#14b8a6"
+                                            fill="#3b82f6"
                                             radius={[4, 4, 0, 0]}
                                             barSize={taskPerformance.length > 30 ? 8 : (taskPerformance.length > 14 ? 12 : 25)}
                                         />

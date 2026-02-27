@@ -5,22 +5,40 @@ const db = require('../config/db');
 // @access  Private (super_admin)
 const getTasks = async (req, res) => {
     try {
+        const { startDate, endDate, category } = req.query;
         let sql = `
             SELECT t.*, u.name as mentor_name, u.email as mentor_email 
             FROM tasks t 
             LEFT JOIN users u ON t.assigned_to = u.id 
+            WHERE 1=1
         `;
         let params = [];
 
+        // Filter by date
+        if (startDate) {
+            sql += ' AND t.created_at >= ?';
+            params.push(startDate);
+        }
+        if (endDate) {
+            sql += ' AND t.created_at <= ?';
+            params.push(endDate + ' 23:59:59');
+        }
+
+        // Filter by category
+        if (category === 'Active Records') {
+            sql += " AND t.status NOT IN ('Completed', 'Success', 'Rejected')";
+        } else if (category === 'Archived Records') {
+            sql += " AND t.status IN ('Completed', 'Success', 'Rejected')";
+        }
+
         // Role-based filtering
         if (req.user.role === 'academic_head') {
-            sql += ' WHERE t.assigned_by = ?';
+            sql += ' AND t.assigned_by = ?';
             params.push(req.user.id);
         } else if (req.user.role === 'mentor' || req.user.role === 'faculty' || req.user.role === 'mentor_head') {
-            sql += ' WHERE t.assigned_to = ?';
+            sql += ' AND t.assigned_to = ?';
             params.push(req.user.id);
         } else if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
-            // Other roles see nothing by default
             return res.status(200).json({ success: true, count: 0, data: [] });
         }
 

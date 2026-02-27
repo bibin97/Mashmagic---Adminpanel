@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { FileText, DownloadCloud, Filter, Calendar } from 'lucide-react';
+import { FileText, DownloadCloud, Filter, Calendar, FileSpreadsheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import * as XLSX from 'xlsx';
 
 const Reports = () => {
     const [filters, setFilters] = useState({
@@ -10,38 +11,42 @@ const Reports = () => {
         category: 'All'
     });
 
-    const downloadAsCSV = (data, filename) => {
+    const exportToFile = (data, filename, format = 'xlsx') => {
         if (!data || !data.length) {
             toast.error("No data available to export");
             return;
         }
 
-        const headers = Object.keys(data[0]);
-        const csvRows = [
-            headers.join(','), // Header row
-            ...data.map(row =>
-                headers.map(header => {
-                    const value = row[header] === null ? '' : row[header];
-                    // Handle commas in values by wrapping in quotes
-                    return typeof value === 'string' && value.includes(',')
-                        ? `"${value}"`
-                        : value;
-                }).join(',')
-            )
-        ];
+        try {
+            const worksheet = XLSX.utils.json_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
 
-        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            const dateStr = new Date().toISOString().split('T')[0];
+            const fullFilename = `${filename}_${dateStr}.${format}`;
+
+            if (format === 'csv') {
+                const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", fullFilename);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } else {
+                XLSX.writeFile(workbook, fullFilename);
+            }
+        } catch (error) {
+            console.error("Export error:", error);
+            toast.error("Failed to generate file");
+        }
     };
 
-    const handleDownload = async (type) => {
-        const loadingToast = toast.loading(`Preparing ${type} Analytics...`);
+    const handleDownload = async (type, format = 'csv') => {
+        const loadingToast = toast.loading(`Preparing ${type} ${format.toUpperCase()}...`);
         try {
             let endpoint = '';
             let filename = '';
@@ -57,11 +62,18 @@ const Reports = () => {
                 filename = 'task_analytics';
             }
 
-            const response = await api.get(endpoint);
+            // Add query params for filtering if needed
+            const response = await api.get(endpoint, {
+                params: {
+                    startDate: filters.startDate,
+                    endDate: filters.endDate,
+                    category: filters.category
+                }
+            });
 
             if (response.data.success) {
-                downloadAsCSV(response.data.data, filename);
-                toast.success(`${type} Data exported successfully!`, { id: loadingToast });
+                exportToFile(response.data.data, filename, format);
+                toast.success(`${type} Data exported as ${format.toUpperCase()}!`, { id: loadingToast });
             } else {
                 throw new Error(response.data.message || "Failed to fetch data");
             }
@@ -75,7 +87,7 @@ const Reports = () => {
         <div className="flex flex-col gap-8">
             <div className="flex flex-col gap-1">
                 <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Enterprise Analytics</h2>
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1 text-slate-500">Configure filters and generate master data exports</p>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">Configure filters and generate master data exports</p>
             </div>
 
             <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
@@ -89,7 +101,7 @@ const Reports = () => {
                     <FilterGroup label="Start Capture Date">
                         <input
                             type="date"
-                            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+                            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-medium"
                             value={filters.startDate}
                             onChange={e => setFilters({ ...filters, startDate: e.target.value })}
                         />
@@ -97,7 +109,7 @@ const Reports = () => {
                     <FilterGroup label="End Capture Date">
                         <input
                             type="date"
-                            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+                            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-medium"
                             value={filters.endDate}
                             onChange={e => setFilters({ ...filters, endDate: e.target.value })}
                         />
@@ -131,16 +143,29 @@ const Reports = () => {
                         </div>
                         <h3 className="text-xl font-black text-slate-900 mb-2">{type} Analytics</h3>
                         <p className="text-sm text-slate-500 font-medium mb-8">Export all current {type.toLowerCase()} records including meta-properties.</p>
-                        <button
-                            className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-bold text-sm transition-all shadow-lg hover:brightness-110 ${color === 'blue' ? 'bg-blue-600 text-white shadow-blue-100' :
-                                color === 'emerald' ? 'bg-emerald-600 text-white shadow-emerald-100' :
-                                    'bg-amber-600 text-white shadow-amber-100'
-                                }`}
-                            onClick={() => handleDownload(type)}
-                        >
-                            <DownloadCloud size={18} />
-                            <span>Download CSV</span>
-                        </button>
+
+                        <div className="flex flex-col gap-2 w-full">
+                            <button
+                                className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-bold text-sm transition-all shadow-lg hover:brightness-110 active:scale-95 ${color === 'blue' ? 'bg-blue-600 text-white shadow-blue-100' :
+                                    color === 'emerald' ? 'bg-emerald-600 text-white shadow-emerald-100' :
+                                        'bg-amber-600 text-white shadow-amber-100'
+                                    }`}
+                                onClick={() => handleDownload(type, 'csv')}
+                            >
+                                <DownloadCloud size={18} />
+                                <span>Download CSV</span>
+                            </button>
+                            <button
+                                className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 font-bold text-sm transition-all border-2 group-hover:bg-slate-50 active:scale-95 ${color === 'blue' ? 'border-blue-100 text-blue-600' :
+                                    color === 'emerald' ? 'border-emerald-100 text-emerald-600' :
+                                        'border-amber-100 text-amber-600'
+                                    }`}
+                                onClick={() => handleDownload(type, 'xlsx')}
+                            >
+                                <FileSpreadsheet size={18} />
+                                <span>Download Excel</span>
+                            </button>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -156,3 +181,4 @@ const FilterGroup = ({ label, children }) => (
 );
 
 export default Reports;
+

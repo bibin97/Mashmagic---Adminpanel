@@ -323,7 +323,38 @@ const updateUserForAdmin = async (req, res) => {
 // @route   GET /api/admin/students
 const getAllStudentsForAdmin = async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT id, name, NULL as email, grade, mentor_name as mentor, faculty_name as faculty, subject, time_table as timetable, next_installment_date as nextInstallment, status FROM students');
+        const { startDate, endDate, category } = req.query;
+        let sql = `
+            SELECT 
+                id, roll_number, name, grade, course, hour, 
+                mentor_name as mentor, faculty_name as faculty, 
+                subject, time_table as timetable, 
+                next_installment_date as nextInstallment, 
+                status, onboarding_status, 
+                attendance_percentage, performance_status,
+                created_at 
+            FROM students WHERE 1=1
+        `;
+        let params = [];
+
+        if (startDate) {
+            sql += ' AND created_at >= ?';
+            params.push(startDate);
+        }
+        if (endDate) {
+            sql += ' AND created_at <= ?';
+            params.push(endDate + ' 23:59:59');
+        }
+
+        if (category === 'Active Records') {
+            sql += ' AND status = "active"';
+        } else if (category === 'Archived Records') {
+            sql += ' AND status IN ("inactive", "rejected", "completed")';
+        }
+
+        sql += ' ORDER BY created_at DESC';
+
+        const [rows] = await db.query(sql, params);
         res.status(200).json({ success: true, count: rows.length, data: rows });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -451,17 +482,36 @@ const deleteSubAdmin = async (req, res) => {
 // @route   GET /api/admin/mentors
 const getAllMentorsForAdmin = async (req, res) => {
     try {
+        const { startDate, endDate, category } = req.query;
+        let whereClauses = ["u.role = 'mentor'"];
+        let params = [];
+
+        if (startDate) {
+            whereClauses.push("u.createdAt >= ?");
+            params.push(startDate);
+        }
+        if (endDate) {
+            whereClauses.push("u.createdAt <= ?");
+            params.push(endDate + ' 23:59:59');
+        }
+
+        if (category === 'Active Records') {
+            whereClauses.push("u.status = 'active'");
+        } else if (category === 'Archived Records') {
+            whereClauses.push("u.status != 'active'");
+        }
+
         const query = `
             SELECT 
-                u.id, u.name, u.email, u.phone_number as phone, u.status,
+                u.id, u.name, u.email, u.phone_number as phone, u.status, u.createdAt as created_at,
                 (SELECT COUNT(*) FROM students s WHERE s.mentor_id = u.id AND s.status = 'active') as studentsCount,
                 (SELECT COUNT(*) FROM tasks t WHERE t.assigned_to = u.id) as tasksAssigned,
                 (SELECT COUNT(*) FROM tasks t WHERE t.assigned_to = u.id AND t.status = 'Completed') as completedTasks
             FROM users u
-            WHERE u.role = 'mentor'
+            WHERE ${whereClauses.join(' AND ')}
             ORDER BY u.name ASC
         `;
-        const [rows] = await db.query(query);
+        const [rows] = await db.query(query, params);
         const mappedData = rows.map(row => ({
             ...row,
             completionRate: row.tasksAssigned > 0 ? Math.round((row.completedTasks / row.tasksAssigned) * 100) : 0
