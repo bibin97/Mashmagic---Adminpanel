@@ -624,34 +624,85 @@ module.exports = {
     // @route   GET /api/admin/task-analytics
     getTaskAnalytics: async (req, res) => {
         try {
-            const days = parseInt(req.query.days);
-            // If days is 0 (Today), we still want at least 1 row.
-            const interval = isNaN(days) ? 6 : days;
+            const { range } = req.query;
+            let daysCount = 7; // Default
 
+            const mapping = {
+                'today': 1,
+                'yesterday': 2,
+                'last3': 3,
+                'last7': 7,
+                'last14': 14,
+                'last30': 30,
+                'last60': 60,
+                'last90': 90
+            };
+
+            if (mapping[range]) {
+                daysCount = mapping[range];
+            }
+
+            // Create helper to format date as YYYY-MM-DD in local time
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const startDate = new Date(today);
+            startDate.setDate(today.getDate() - (daysCount - 1));
+
+            console.log(`ANALYTICS_DEBUG: range=${range}, daysCount=${daysCount}, startDate=${startDate.toISOString()}, today=${today.toISOString()}`);
+
+            // Query DB
             const [rows] = await db.query(`
-                WITH RECURSIVE dates AS (
-                    SELECT CURDATE() as date_val
-                    UNION ALL
-                    SELECT DATE_SUB(date_val, INTERVAL 1 DAY)
-                    FROM dates
-                    WHERE date_val > DATE_SUB(CURDATE(), INTERVAL ? DAY)
-                )
                 SELECT 
-                    CASE 
-                        WHEN ? <= 6 THEN DATE_FORMAT(d.date_val, '%a')
-                        WHEN ? <= 30 THEN DATE_FORMAT(d.date_val, '%b %d')
-                        ELSE DATE_FORMAT(d.date_val, '%b %d')
-                    END as name,
-                    d.date_val as date,
-                    COALESCE(COUNT(t.id), 0) as tasks,
-                    COALESCE(SUM(CASE WHEN (t.status = 'Completed' OR t.status = 'Success') THEN 1 ELSE 0 END), 0) as completed
-                FROM dates d
-                LEFT JOIN tasks t ON DATE(t.created_at) = d.date_val
-                GROUP BY d.date_val
-                ORDER BY d.date_val ASC
-            `, [interval, interval, interval]);
-            res.status(200).json({ success: true, data: rows });
+                    DATE_FORMAT(created_at, '%Y-%m-%d') as date,
+                    COUNT(*) as total_tasks,
+                    SUM(CASE WHEN (status = 'Completed' OR status = 'Success') THEN 1 ELSE 0 END) as completed_tasks
+                FROM tasks
+                WHERE created_at >= ?
+                GROUP BY DATE(created_at)
+                ORDER BY DATE(created_at) ASC
+            `, [startDate]);
+
+            // Create a lookup map
+            const dbDataMap = {};
+            rows.forEach(row => {
+                dbDataMap[row.date] = {
+                    total_tasks: parseInt(row.total_tasks) || 0,
+                    completed_tasks: parseInt(row.completed_tasks) || 0
+                };
+            });
+
+            // Generate full date range
+            const fullRangeData = [];
+            let currentDate = new Date(startDate);
+
+            while (currentDate <= today) {
+                const dateStr = formatDate(currentDate);
+                const dayData = dbDataMap[dateStr] || { total_tasks: 0, completed_tasks: 0 };
+
+                // Always use Month Date labels as per user request
+                const name = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                fullRangeData.push({
+                    date: dateStr,
+                    name: name,
+                    tasks: dayData.total_tasks,
+                    completed: dayData.completed_tasks
+                });
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+
+            console.log(`ANALYTICS_DEBUG: returning ${fullRangeData.length} days`);
+            res.status(200).json({ success: true, data: fullRangeData });
         } catch (error) {
+            console.error("TASK_ANALYTICS_ERROR:", error);
             res.status(500).json({ success: false, message: error.message });
         }
     }
